@@ -1,6 +1,6 @@
-==============================================================
-django-views-breadcrumbs - Breadcrumbs support on django views
-==============================================================
+==========================================================================
+django-views-breadcrumbs - Breadcrumbs support on django class based views
+==========================================================================
 
 Using django-views-breadcrumbs
 ==============================
@@ -32,6 +32,8 @@ When you pass ``parent_args``, parent view will be not dispatched::
                )
     class ProductDetailView(DetailView):
         ...
+
+``parent_args`` must return list of args, kwargs and context, witch will pass to parent breadcrumb ``object`` parameter
 
 Settings
 --------
