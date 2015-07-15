@@ -1,6 +1,6 @@
-==========================================================================
-django-views-breadcrumbs - Breadcrumbs support on django class based views
-==========================================================================
+==============================================================
+django-views-breadcrumbs - Breadcrumbs support on django views
+==============================================================
 
 Using django-views-breadcrumbs
 ==============================
