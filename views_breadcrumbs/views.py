@@ -5,7 +5,7 @@ __author__ = 'Dmitry Puhov (dmitry.puhov@gmail.com)'
 import inspect
 from functools import wraps
 from django.core.urlresolvers import reverse, resolve, NoReverseMatch
-from django.http.response import HttpResponseRedirectBase
+from django.http.response import HttpResponseRedirectBase, HttpResponseNotAllowed
 from django.utils.http import urlquote
 import types
 
@@ -92,12 +92,12 @@ class BreadcrumbDecorator(object):
                 cut_args_length = 1
             else:
                 raise RuntimeError("Wrong dispatch type: %s" % type(dispatch))
+
             view_name = kwargs.pop(self.PARENT_VIEW_NAME_KWARG, None)
             first_breadcrumb = view_name is None
             if view_name is None:
                 view_name = resolve(request.path).url_name
             context = kwargs.pop(self.PARENT_CONTEXT_KWARG, None)
-
             response = None
             if not first_breadcrumb:
                 if context:
@@ -119,12 +119,12 @@ class BreadcrumbDecorator(object):
                 response.view_dispatch_count = 1
                 if not hasattr(response, 'dispatched_views'):
                     response.dispatched_views = []
-                if isinstance(response, HttpResponseRedirectBase):
+                if isinstance(response, (HttpResponseRedirectBase, HttpResponseNotAllowed)) \
+                        or request.method.upper() in ('OPTIONS', ):
                     return response
                 response.dispatched_views.append(self.view)
                 if hasattr(response, 'context_data'):
                     context = response.context_data
-
             object_ = self.object(args, kwargs, context, request) if hasattr(self.object, '__call__') else self.object
             args = args[cut_args_length:]
 
