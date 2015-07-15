@@ -1,4 +1,4 @@
-"""Breadcrumbs support on django class based views"""
+"""Breadcrumbs support on django views"""
 
 VERSION = (0, 1, 'dev3')
 
