@@ -16,7 +16,7 @@ setup(
         'django-appconf',
     ],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
 
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.6',
