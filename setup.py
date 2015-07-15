@@ -24,10 +24,12 @@ setup(
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
-
+        'Intended Audience :: Developers',
+        'Environment :: Web Environment',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
+        'Framework :: Django',
     ]
 
 )
