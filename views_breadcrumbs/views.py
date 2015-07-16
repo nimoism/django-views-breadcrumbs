@@ -1,3 +1,6 @@
+from django.utils.encoding import force_text
+import six
+
 __author__ = 'Dmitry Puhov (dmitry.puhov@gmail.com)'
 
 # -*- coding=utf-8 -*-
@@ -36,10 +39,13 @@ class Breadcrumb(object):
             self.url = url
 
     def __str__(self):
-        return self.obj
+        result = self.__unicode__()
+        if six.PY2:
+            return result.encode('utf-8')
+        return result
 
     def __unicode__(self):
-        return self.obj
+        return force_text(self.obj)
 
 
 class FakeResponse(object):
