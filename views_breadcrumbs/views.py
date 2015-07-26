@@ -255,13 +255,18 @@ class BreadcrumbDecorator(object):
         return response
 
     def get_query_string(self, request):
-        if '*' in self.get_params:
-            get_params = request.GET.keys()
+        setted_get_params = set(self.get_params)
+        if '*' in setted_get_params:
+            get_params = set(request.GET.keys())
+            setted_get_params ^= {'*'}
+            get_params |= setted_get_params
         else:
-            get_params = self.get_params
+            get_params = setted_get_params
         get_param_pairs = []
         for k, value_list in request.GET.lists():
             if k not in get_params:
+                continue
+            if '-%s' % k in get_params:
                 continue
             get_param_pairs.extend(['%s=%s' % (k, urlquote(v)) for v in value_list if v != ''])
         query_string = '&'.join(get_param_pairs)
