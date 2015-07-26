@@ -1,6 +1,6 @@
 """Breadcrumbs support on django views"""
 
-VERSION = (0, 1, 'dev6')
+VERSION = (0, 1, 'dev7')
 
 __version__ = '.'.join(map(str, VERSION))
 __author__ = 'Dmitry Puhov'

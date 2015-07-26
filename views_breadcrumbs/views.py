@@ -135,10 +135,13 @@ class BreadcrumbDecorator(object):
             args = args[cut_args_length:]
 
             breadcrumbs = Breadcrumbs()
-            query_string = self.get_query_string(request)
-            if object_ is not None:
-                breadcrumbs.insert(0, Breadcrumb(object_, view_name, view_args=args, view_kwargs=kwargs,
-                                                 query_string=query_string))
+            query_string = self.get_query_string(args, kwargs, context, request)
+
+            objects = object_ if isinstance(object_, types.ListType) else [object_]
+            for object_ in reversed(objects):
+                if object_ is not None:
+                    breadcrumbs.insert(0, Breadcrumb(object_, view_name, view_args=args, view_kwargs=kwargs,
+                                                     query_string=query_string))
             parent_response = self.dispatch_parent(breadcrumbs, request, args, kwargs, context)
             if hasattr(response, 'context_data'):
                 response.context_data[Breadcrumbs.VIEW_CONTEXT_NAME] = breadcrumbs
@@ -254,8 +257,11 @@ class BreadcrumbDecorator(object):
             response = FakeResponse()
         return response
 
-    def get_query_string(self, request):
-        setted_get_params = set(self.get_params)
+    def get_query_string(self, args, kwargs, context, request):
+        if hasattr(self.get_params, '__call__'):
+            setted_get_params = set(self.get_params(args, kwargs, context, request))
+        else:
+            setted_get_params = set(self.get_params)
         if '*' in setted_get_params:
             get_params = set(request.GET.keys())
             setted_get_params ^= {'*'}
