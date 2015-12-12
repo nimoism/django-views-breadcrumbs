@@ -144,6 +144,8 @@ class BreadcrumbDecorator(object):
                                                      query_string=query_string))
             parent_response = self.dispatch_parent(breadcrumbs, request, args, kwargs, context)
             if hasattr(response, 'context_data'):
+                if response.context_data is None:
+                    response.context_data = {}
                 response.context_data[Breadcrumbs.VIEW_CONTEXT_NAME] = breadcrumbs
             response.dispatched_views.extend(parent_response.dispatched_views)
             return response
