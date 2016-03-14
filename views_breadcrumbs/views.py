@@ -61,6 +61,7 @@ class FakeResponse(object):
 class BreadcrumbDecorator(object):
     PARENT_VIEW_NAME_KWARG = 'bc_view_name'
     PARENT_CONTEXT_KWARG = 'bc_context'
+    REQUEST_DISPATCHED = 'bc_dispatched'
 
     def __init__(self, obj=None, parent=None, parent_args=None, get_params=None, static_object=None):
         self.object = obj
@@ -123,6 +124,7 @@ class BreadcrumbDecorator(object):
             if not response:
                 response = dispatch(*args, **kwargs)
                 response.view_dispatch_count = 1
+                setattr(request, self.REQUEST_DISPATCHED, True)
                 if not hasattr(response, 'dispatched_views'):
                     response.dispatched_views = []
                 if isinstance(response, (HttpResponseRedirectBase, HttpResponseNotAllowed)) \
