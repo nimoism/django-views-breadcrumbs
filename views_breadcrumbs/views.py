@@ -1,16 +1,17 @@
+# -*- coding=utf-8 -*-
+from __future__ import unicode_literals
+
 from django.utils.encoding import force_text
 import six
-
-__author__ = 'Dmitry Puhov (dmitry.puhov@gmail.com)'
-
-# -*- coding=utf-8 -*-
-
 import inspect
 from functools import wraps
-from django.core.urlresolvers import reverse, resolve, NoReverseMatch
+from django.core.urlresolvers import reverse, resolve, NoReverseMatch, get_resolver
 from django.http.response import HttpResponseRedirectBase, HttpResponseNotAllowed
 from django.utils.http import urlquote
 import types
+
+
+__author__ = 'Dmitry Puhov (dmitry.puhov@gmail.com)'
 
 
 class Breadcrumbs(list):
@@ -19,24 +20,9 @@ class Breadcrumbs(list):
 
 class Breadcrumb(object):
 
-    def __init__(self, object_, view=None, view_args=None, view_kwargs=None, query_string=''):
-        if view_args is None:
-            view_args = []
-        if view_kwargs is None:
-            view_kwargs = {}
+    def __init__(self, object_, url=None):
         self.obj = object_
-        self.view = view
-        if self.view and hasattr(self.view, '__call__'):
-            view_name = "%s.%s" % (self.view.__module__, self.view.__name__)
-        elif isinstance(self.view, basestring):
-            view_name = self.view
-        else:
-            view_name = None
-        if view_name:
-            url = reverse(view_name, args=view_args, kwargs=view_kwargs)
-            if query_string:
-                url += '?' + query_string
-            self.url = url
+        self.url = url
 
     def __str__(self):
         result = self.__unicode__()
@@ -59,12 +45,13 @@ class FakeResponse(object):
 
 
 class BreadcrumbDecorator(object):
-    PARENT_VIEW_NAME_KWARG = 'bc_view_name'
+    PARENT_VIEW = 'bc_view'
     PARENT_CONTEXT_KWARG = 'bc_context'
     REQUEST_DISPATCHED = 'bc_dispatched'
 
-    def __init__(self, obj=None, parent=None, parent_args=None, get_params=None, static_object=None):
+    def __init__(self, obj=None, view_name=None, parent=None, parent_args=None, get_params=None, static_object=None):
         self.object = obj
+        self.view_name = view_name
         self.parent = parent
         if parent_args is None:
             parent_args = ([], {}, {})
@@ -100,8 +87,10 @@ class BreadcrumbDecorator(object):
             else:
                 raise RuntimeError("Wrong dispatch type: %s" % type(dispatch))
 
-            view_name = kwargs.pop(self.PARENT_VIEW_NAME_KWARG, None)
+            view_name, view = kwargs.pop(self.PARENT_VIEW, (None, None))
             first_breadcrumb = view_name is None
+            if self.view_name:
+                view_name = self.view_name
             if view_name is None:
                 view_name = resolve(request.path).url_name
             context = kwargs.pop(self.PARENT_CONTEXT_KWARG, None)
@@ -137,13 +126,18 @@ class BreadcrumbDecorator(object):
             args = args[cut_args_length:]
 
             breadcrumbs = Breadcrumbs()
-            query_string = self.get_query_string(args, kwargs, context, request)
+            if first_breadcrumb:
+                url = request.get_full_path()
+            else:
+                query_string = self.get_query_string(args, kwargs, context, request)
+                url = reverse(view_name, args=args, kwargs=kwargs)
+                if query_string:
+                    url += '?' + query_string
 
             objects = object_ if isinstance(object_, types.ListType) else [object_]
             for object_ in reversed(objects):
                 if object_ is not None:
-                    breadcrumbs.insert(0, Breadcrumb(object_, view_name, view_args=args, view_kwargs=kwargs,
-                                                     query_string=query_string))
+                    breadcrumbs.insert(0, Breadcrumb(object_, url))
             parent_response = self.dispatch_parent(breadcrumbs, request, args, kwargs, context)
             if hasattr(response, 'context_data'):
                 if response.context_data is None:
@@ -154,12 +148,20 @@ class BreadcrumbDecorator(object):
 
         return _dispatch
 
-    def get_parent_view_name(self, request, args, kwargs, context):
+    def get_parent_view(self, request, args, kwargs, context):
         if hasattr(self.parent, '__call__'):
             parent = self.parent(args, kwargs, context, request)
         else:
             parent = self.parent
-        return parent
+        if isinstance(parent, (types.ListType, types.TupleType)):
+            parent_view_name, parent_view = self.parent
+        elif isinstance(parent, types.StringTypes):
+            p_args, p_kwargs, p_context = self.get_parent_args(request, args, kwargs, context)
+            url = reverse(parent, args=p_args, kwargs=p_kwargs)
+            parent_view_name, parent_view = parent, resolve(url).func
+        else:
+            raise AttributeError('Wrong parent attribute')
+        return parent_view_name, parent_view
 
     def get_parent_args(self, request, args, kwargs, context):
         parent_args = None
@@ -173,92 +175,23 @@ class BreadcrumbDecorator(object):
     def dispatch_parent(self, breadcrumbs, request, args, kwargs, context):
         if not self.parent:
             return FakeResponse()
-        p_view_name = self.get_parent_view_name(request, args, kwargs, context)
-        response = self.dispatch_parent_by_view_name(breadcrumbs, p_view_name, request, args, kwargs, context)
-        if not response.is_dispatched:
-            response = self.dispatch_parent_by_func_name(breadcrumbs, p_view_name)
+        parent_view_name, parent_view = self.get_parent_view(request, args, kwargs, context)
+        p_args, p_kwargs, p_context = self.get_parent_args(request, args, kwargs, context)
+
+        p_kwargs[self.PARENT_VIEW] = (parent_view_name, parent_view)
+        p_kwargs[self.PARENT_CONTEXT_KWARG] = p_context
+        response = parent_view(request, *p_args, **p_kwargs)
+        p_kwargs.pop(self.PARENT_VIEW, None)
+        p_kwargs.pop(self.PARENT_CONTEXT_KWARG, None)
+
+        response.is_dispatched = True
+        if hasattr(response, 'context_data'):
+            for bc in reversed(list(response.context_data[Breadcrumbs.VIEW_CONTEXT_NAME])):
+                breadcrumbs.insert(0, bc)
         if not response.is_dispatched:
             p_args, p_kwargs, p_context = self.get_parent_args(request, args, kwargs, context)
-            raise RuntimeError("Parent not dispatched %s, args:%s, kwargs:%s" % (p_view_name, p_args, p_kwargs))
-        return response
-
-    def dispatch_parent_by_view_name(self, breadcrumbs, parent_view_name, request, args, kwargs, context):
-        """
-        @param breadcrumbs: breadcrumbs
-        @type breadcrumbs: Breadcrumbs
-        @param parent_view_name: parent view name
-        @type parent_view_name: str
-        @param request: http request
-        @type request: django.http.request.HttpRequest
-        @param args: parent args
-        @type args: list
-        @param kwargs: parent kwargs
-        @type kwargs: dict
-        @param context: parent context
-        @type context: dict
-        @return: response
-        @rtype: django.http.http.HttpResponse|FakeResponse
-        """
-        p_args, p_kwargs, p_context = self.get_parent_args(request, args, kwargs, context)
-        try:
-            url = reverse(parent_view_name, args=p_args, kwargs=p_kwargs)
-        except NoReverseMatch as e:
-            response = FakeResponse()
-        else:
-            func = resolve(url).func
-            m = __import__(func.__module__, globals(), locals(), [func.__name__, ])
-            parent = getattr(m, func.__name__)
-            p_kwargs[self.PARENT_VIEW_NAME_KWARG] = parent_view_name
-            p_kwargs[self.PARENT_CONTEXT_KWARG] = p_context
-            if isinstance(parent, types.TypeType):
-                response = parent(request=request, kwargs=p_kwargs).dispatch(request, *p_args, **p_kwargs)
-                response.is_dispatched = True
-            elif isinstance(parent, types.FunctionType):
-                response = self.insert_old_style_breadcrumbs_bc(breadcrumbs, parent)
-            else:
-                raise RuntimeError("Wrong parent type: %s" % type(parent))
-            if hasattr(response, 'context_data'):
-                for bc in reversed(list(response.context_data[Breadcrumbs.VIEW_CONTEXT_NAME])):
-                    breadcrumbs.insert(0, bc)
-        finally:
-            p_kwargs.pop(self.PARENT_VIEW_NAME_KWARG, None)
-            p_kwargs.pop(self.PARENT_CONTEXT_KWARG, None)
-        return response
-
-    @classmethod
-    def insert_old_style_breadcrumbs_bc(cls, breadcrumbs, parent_func):
-        """
-        @param breadcrumbs: breadcrumbs
-        @type breadcrumbs: Breadcrumbs
-        @param parent_func: function
-        @type parent_func: function
-        @return: is inserted
-        @rtype: bool
-        """
-        if hasattr(parent_func, 'bc_obj'):
-            p_obj = parent_func.bc_obj
-            p_view_args = []
-            p_view_kwargs = {}
-            breadcrumbs.insert(0, Breadcrumb(p_obj, parent_func, p_view_args, p_view_kwargs))
-            return FakeResponse()
-        return FakeResponse(is_dispatched=False)
-
-    def dispatch_parent_by_func_name(self, breadcrumbs, parent_full_func_name):
-        """
-        @param breadcrumbs: breadcrumbs
-        @type breadcrumbs: Breadcrumbs
-        @param parent_full_func_name: full function name with module
-        @type parent_full_func_name: str
-        @return: is dispatched
-        @rtype: bool
-        """
-        try:
-            module_name, func_name = parent_full_func_name.rsplit('.', 1)
-            module = __import__(module_name, globals(), locals(), [func_name])
-            p_view_func = getattr(module, func_name)
-            response = self.insert_old_style_breadcrumbs_bc(breadcrumbs, p_view_func)
-        except (ImportError, AttributeError, ValueError) as e:
-            response = FakeResponse()
+            raise RuntimeError("Parent not dispatched %s, args:%s, kwargs:%s" %
+                               (parent_view_name, p_args, p_kwargs))
         return response
 
     def get_query_string(self, args, kwargs, context, request):
