@@ -137,7 +137,9 @@ class BreadcrumbDecorator(object):
             objects = object_ if isinstance(object_, types.ListType) else [object_]
             for object_ in reversed(objects):
                 if object_ is not None:
-                    breadcrumbs.insert(0, Breadcrumb(object_, url))
+                    if not isinstance(object_, Breadcrumb):
+                        object_ = Breadcrumb(object_, url)
+                    breadcrumbs.insert(0, object_)
             parent_response = self.dispatch_parent(breadcrumbs, request, args, kwargs, context)
             if hasattr(response, 'context_data'):
                 if response.context_data is None:
