@@ -5,7 +5,7 @@ from django.utils.encoding import force_text
 import six
 import inspect
 from functools import wraps
-from django.core.urlresolvers import reverse, resolve, NoReverseMatch, get_resolver
+from django.core.urlresolvers import reverse, resolve
 from django.http.response import HttpResponseRedirectBase, HttpResponseNotAllowed
 from django.utils.http import urlquote
 import types
