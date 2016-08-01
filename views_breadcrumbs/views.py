@@ -1,15 +1,16 @@
 # -*- coding=utf-8 -*-
 from __future__ import unicode_literals
 
+from django.http.request import HttpRequest
 from django.utils.encoding import force_text
 import six
-import inspect
 from functools import wraps
 from django.core.urlresolvers import reverse, resolve
 from django.http.response import HttpResponseRedirectBase, HttpResponseNotAllowed
 from django.utils.http import urlquote
 import types
 
+from django.views.generic.base import View
 
 __author__ = 'Dmitry Puhov (dmitry.puhov@gmail.com)'
 
@@ -66,7 +67,7 @@ class BreadcrumbDecorator(object):
 
     def __call__(self, view, *args, **kwargs):
         self.view = view
-        if isinstance(view, types.TypeType):
+        if isinstance(view, six.class_types):
             view.dispatch = self.dispatch(view.dispatch)
             return view
         elif isinstance(view, types.FunctionType):
@@ -78,10 +79,10 @@ class BreadcrumbDecorator(object):
 
         @wraps(dispatch)
         def _dispatch(*args, **kwargs):
-            if inspect.ismethod(dispatch):
+            if isinstance(args[0], View):
                 request = args[1]
                 cut_args_length = 2
-            elif inspect.isfunction(dispatch):
+            elif isinstance(args[0], HttpRequest):
                 request = args[0]
                 cut_args_length = 1
             else:
@@ -134,7 +135,7 @@ class BreadcrumbDecorator(object):
                 if query_string:
                     url += '?' + query_string
 
-            objects = object_ if isinstance(object_, types.ListType) else [object_]
+            objects = object_ if isinstance(object_, (list, tuple)) else [object_]
             for object_ in reversed(objects):
                 if object_ is not None:
                     if not isinstance(object_, Breadcrumb):
@@ -155,9 +156,9 @@ class BreadcrumbDecorator(object):
             parent = self.parent(args, kwargs, context, request)
         else:
             parent = self.parent
-        if isinstance(parent, (types.ListType, types.TupleType)):
+        if isinstance(parent, (list, tuple)):
             parent_view_name, parent_view = self.parent
-        elif isinstance(parent, types.StringTypes):
+        elif isinstance(parent, six.string_types):
             p_args, p_kwargs, p_context = self.get_parent_args(request, args, kwargs, context)
             url = reverse(parent, args=p_args, kwargs=p_kwargs)
             parent_view_name, parent_view = parent, resolve(url).func
