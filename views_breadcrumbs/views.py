@@ -157,7 +157,7 @@ class BreadcrumbDecorator(object):
         else:
             parent = self.parent
         if isinstance(parent, (list, tuple)):
-            parent_view_name, parent_view = self.parent
+            parent_view_name, parent_view = parent
         elif isinstance(parent, six.string_types):
             p_args, p_kwargs, p_context = self.get_parent_args(request, args, kwargs, context)
             url = reverse(parent, args=p_args, kwargs=p_kwargs)
